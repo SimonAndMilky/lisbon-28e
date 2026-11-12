@@ -1,0 +1,340 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#f4efe4">
+<title>里斯本 28E 电车 · 景点与海鲜餐厅地图</title>
+<meta name="description" content="Lisbon 28E tram: route by elevation, sights, seafood restaurants, photos and Google Maps links.">
+<style>
+:root{--ink:#202a30;--muted:#68747a;--gold-dark:#9a6a08;--paper:#f4efe4;--card:#fffdf8;--line:#d8d0c2;--shadow:0 12px 34px rgba(35,39,40,.18);--food:#b5452f}
+*{box-sizing:border-box}html,body{height:100%;width:100%;margin:0;overflow:hidden;background:var(--paper);color:var(--ink);font-family:Inter,ui-sans-serif,system-ui,-apple-system,"PingFang SC","Noto Sans CJK SC",sans-serif;-webkit-tap-highlight-color:transparent}
+#map{position:fixed;inset:0;overflow:hidden;background:#eee8d9;touch-action:none;cursor:grab;isolation:isolate}#map.dragging{cursor:grabbing}
+#fallback,#tiles,#route-svg,#markers{position:absolute;inset:0;width:100%;height:100%}
+#fallback{z-index:0;background:#eee9dc;transition:opacity .3s}
+#tiles{z-index:1;overflow:hidden;pointer-events:none;opacity:.6;filter:grayscale(.7) saturate(.55) brightness(1.1) contrast(.85)}
+#tiles img{position:absolute;width:256px;height:256px;max-width:none;user-select:none;-webkit-user-drag:none}
+#route-svg{z-index:2;overflow:visible;pointer-events:none}#markers{z-index:3;pointer-events:none}
+.marker{position:absolute;transform:translate(-50%,-50%);pointer-events:auto;border:0;background:transparent;padding:0;cursor:pointer;display:flex;align-items:center;gap:6px;white-space:nowrap;filter:drop-shadow(0 2px 3px rgba(0,0,0,.23))}
+.pin{display:grid;place-items:center;width:32px;height:32px;border-radius:50%;border:2.5px solid #fff;background:#c28c16;color:#fff;font-weight:850;font-size:14px}
+.marker.hotel .pin{background:#c85f4e}.marker.start .pin{background:#246b83}
+.marker.food .pin{background:var(--food);border-radius:10px;width:30px;height:30px;font-size:15px}
+.marker .name{font-size:12px;font-weight:750;color:#26343a;background:rgba(255,253,248,.95);border:1px solid rgba(90,83,68,.2);padding:4px 7px;border-radius:7px}
+.marker.food .name{color:#7d2b1b}
+.marker.active .pin{outline:4px solid rgba(216,163,41,.35);transform:scale(1.12)}
+.marker.food.active .pin{outline-color:rgba(181,69,47,.3)}
+body.hide-food .marker.food{display:none}body.far .marker:not(.active) .name{display:none}body.hide-names .marker:not(.active) .name{display:none}
+#me-dot{position:absolute;width:18px;height:18px;margin:-9px 0 0 -9px;border-radius:50%;background:#1a73e8;border:3px solid #fff;box-shadow:0 0 0 7px rgba(26,115,232,.22),0 1px 4px #0004;pointer-events:none}
+.topbar{position:absolute;z-index:10;left:16px;right:16px;top:calc(14px + env(safe-area-inset-top));display:flex;align-items:flex-start;justify-content:space-between;gap:12px;pointer-events:none}
+.brand,.service,.legend,.attribution,.popup,.map-controls,.tile-warning,.timetable{pointer-events:auto}
+.brand{background:rgba(255,253,248,.94);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border:1px solid var(--line);border-radius:14px;padding:10px 14px;box-shadow:var(--shadow);max-width:min(390px,60vw)}
+.brand strong{display:block;font-size:16px}.brand span{display:block;margin-top:3px;color:var(--muted);font-size:11px}
+.service{background:#26363d;color:#fff;border-radius:13px;padding:10px 13px;box-shadow:var(--shadow);border:1px solid rgba(255,255,255,.15);cursor:pointer;text-align:left;min-width:218px;font:inherit}
+.service .line{font-size:12px;font-weight:800}.service .hours{font-size:13px;margin-top:3px;font-weight:750}.service .freq{font-size:10px;color:#d8e2e4;margin-top:2px}
+.map-controls{position:absolute;z-index:8;right:16px;bottom:calc(22px + env(safe-area-inset-bottom));display:grid;gap:8px;transition:opacity .2s}
+.map-controls button{width:42px;height:42px;border:1px solid #d5cdbf;border-radius:12px;background:rgba(255,253,248,.96);box-shadow:0 4px 14px #26343b22;color:#26343a;font-size:22px;font-weight:600;cursor:pointer;padding:0}
+/* 图例 */
+.legend{position:absolute;z-index:8;left:16px;bottom:calc(20px + env(safe-area-inset-bottom));background:rgba(255,253,248,.95);border:1px solid var(--line);border-radius:14px;padding:10px 12px;font-size:11px;color:#4d5a5f;box-shadow:0 4px 14px #26343b18;width:min(270px,calc(100vw - 90px));transition:opacity .2s}
+.legend .row{display:flex;align-items:center;gap:8px;margin-top:6px}.legend .row:first-child{margin-top:0}
+.legend .bar{flex:1;height:8px;border-radius:5px}
+.legend .k{display:flex;justify-content:space-between;font-size:10px;color:#7a8589;margin-top:2px}
+.legend .ret{width:28px;height:0;border-top:3px dashed #2f6fb0}
+.legend .chips{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap}
+.legend .chip{border:1px solid #d8d0c2;background:#fff;border-radius:99px;padding:4px 9px;font-size:11px;font-weight:700;color:#3d4a50;cursor:pointer;font-family:inherit}
+.legend .chip.on{background:#26363d;color:#fff;border-color:#26363d}
+.legend .src{font-size:9px;color:#97a0a3;margin-top:5px}
+.legend .collapse{position:absolute;right:6px;top:4px;border:0;background:none;font-size:14px;color:#8a9497;cursor:pointer;padding:4px}
+.legend.min .body{display:none}.legend.min{width:auto}
+.attribution{position:absolute;z-index:8;right:66px;bottom:calc(4px + env(safe-area-inset-bottom));color:#4f5c60;background:rgba(255,253,248,.78);border-radius:5px;padding:2px 5px;font-size:9px}.attribution a{color:#315f70;text-decoration:none}
+/* 卡片 */
+.popup{position:absolute;z-index:12;right:18px;top:84px;width:min(390px,calc(100vw - 36px));max-height:calc(100vh - 110px);background:var(--card);border:1px solid #d6cdbd;border-radius:20px;box-shadow:var(--shadow);padding:0;overflow:hidden;display:none;flex-direction:column}
+.popup.open{display:flex;animation:appear .18s ease-out}@keyframes appear{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+#popup-content{display:flex;flex-direction:column;min-height:0;flex:1}
+.popup .scroll{flex:1;min-height:0;overflow:auto;-webkit-overflow-scrolling:touch;padding:14px 17px 16px}
+.popup .eyebrow{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--gold-dark);font-weight:850}
+.popup.food .eyebrow{color:var(--food)}
+.popup h2{font-size:20px;line-height:1.2;margin:5px 34px 8px 0}
+.popup p{font-size:13px;line-height:1.65;color:#4e5b60;margin:8px 0}
+.popup .meta{display:flex;gap:7px;flex-wrap:wrap;margin:10px 0}
+.pill{display:inline-block;border-radius:99px;padding:5px 9px;background:#f3ecd9;color:#70520f;font-size:11px;font-weight:750}.pill.blue{background:#e5eff1;color:#285c6c}.pill.red{background:#f7e4df;color:#8a2f1e}.pill.green{background:#e3f1e5;color:#2b6a35}.pill.grey{background:#eee;color:#666}
+.popup .action{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
+.popup a.btn,.popup button.btn{display:inline-flex;align-items:center;justify-content:center;border-radius:10px;padding:10px 11px;font-size:12px;font-weight:750;text-decoration:none;border:1px solid #d8d0c2;background:#fff;color:#294b56;cursor:pointer;font-family:inherit;flex:1;min-width:120px}
+.popup a.btn.primary{background:#26363d;color:#fff;border-color:#26363d}
+.popup .close{position:absolute;right:12px;top:12px;width:32px;height:32px;border:0;border-radius:50%;background:rgba(255,255,255,.92);box-shadow:0 2px 8px #0002;color:#4d585d;font-size:19px;padding:0;z-index:4;cursor:pointer}
+.hours{width:100%;border-collapse:collapse;font-size:12px;margin:6px 0 2px}.hours td{padding:4px 0;border-bottom:1px solid #f0eadf;color:#56636a}.hours td:last-child{text-align:right}.hours tr.today td{color:#26343a;font-weight:800}
+details{margin:8px 0}details summary{font-size:12px;font-weight:750;color:#294b56;cursor:pointer;list-style:none}details summary::-webkit-details-marker{display:none}details summary::after{content:" ▾"}details[open] summary::after{content:" ▴"}
+.dishes{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}.dishes span{font-size:11px;background:#faf3e6;border:1px solid #eadfc8;border-radius:7px;padding:4px 7px;color:#5b4a2a}
+.note{font-size:11px!important;color:#8a9497!important;line-height:1.5!important}
+.gallery{position:relative;flex:none;background:#e9e3d6}
+.gallery .track{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;scrollbar-width:none;aspect-ratio:16/10}
+.gallery .track::-webkit-scrollbar{display:none}
+.gallery .slide{flex:0 0 100%;scroll-snap-align:center;position:relative;background:#ddd5c5 linear-gradient(110deg,#e6dfd1 30%,#f1ece2 50%,#e6dfd1 70%);background-size:200% 100%;animation:shimmer 1.3s linear infinite}
+@keyframes shimmer{to{background-position:-200% 0}}
+.gallery img{width:100%;height:100%;object-fit:cover;display:block;opacity:0;transition:opacity .3s}.gallery img.ok{opacity:1}
+.gallery .cap{position:absolute;left:0;right:0;bottom:0;padding:26px 70px 30px 12px;background:linear-gradient(transparent,rgba(0,0,0,.55));color:#fff;font-size:12px;font-weight:700;pointer-events:none}
+.gallery .count{position:absolute;right:10px;bottom:10px;background:rgba(20,26,30,.6);color:#fff;font-size:11px;font-weight:700;padding:3px 8px;border-radius:99px}
+.gallery .dots{position:absolute;left:0;right:0;bottom:10px;display:flex;justify-content:center;gap:6px;pointer-events:none}
+.gallery .dots i{width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,.55);transition:all .2s}.gallery .dots i.on{background:#fff;width:16px;border-radius:4px}
+.gallery .nav{position:absolute;top:50%;transform:translateY(-50%);width:34px;height:34px;border-radius:50%;border:0;background:rgba(255,255,255,.9);color:#26343a;font-size:18px;box-shadow:0 2px 8px #0003;cursor:pointer;padding:0}
+.gallery .nav.prev{left:10px}.gallery .nav.next{right:10px}
+.gallery .credit{position:absolute;left:10px;top:10px;font-size:9px;color:#fff;background:rgba(20,26,30,.5);padding:2px 6px;border-radius:5px;text-decoration:none}
+@media(hover:none){.gallery .nav{display:none}}
+.stepper{display:flex;gap:8px;margin-top:12px;padding-top:12px;border-top:1px solid #ece5d8}.stepper button{flex:1}.stepper button:disabled{opacity:.35}
+.timetable{position:absolute;z-index:12;top:84px;right:18px;width:min(350px,calc(100vw - 36px));max-height:calc(100vh - 110px);overflow:auto;padding:16px;background:var(--card);border:1px solid #d6cdbd;border-radius:16px;box-shadow:var(--shadow);display:none}
+.timetable.open{display:block}.timetable h3{margin:0 32px 9px 0;font-size:17px}.timetable p{margin:6px 0;color:#4f5d62;font-size:12px;line-height:1.6}
+.timetable .close{position:absolute;right:11px;top:10px;border:0;background:#f1ede4;border-radius:50%;width:29px;height:29px;font-size:18px;cursor:pointer}
+.timetable a{color:#285c6c}
+.tile-warning{position:absolute;z-index:7;left:50%;top:50%;transform:translate(-50%,-50%);max-width:330px;text-align:center;background:rgba(255,253,248,.93);border:1px solid var(--line);border-radius:12px;padding:12px 14px;color:#667277;font-size:12px;line-height:1.5;display:none}.tile-warning.show{display:block}
+#toast{position:absolute;z-index:20;left:50%;top:50%;transform:translate(-50%,-50%);background:rgba(32,42,48,.9);color:#fff;font-size:13px;padding:10px 14px;border-radius:10px;opacity:0;transition:opacity .2s;pointer-events:none;max-width:80vw;text-align:center}#toast.show{opacity:1}
+@media(max-width:700px){
+ .topbar{left:10px;right:10px;top:calc(10px + env(safe-area-inset-top))}.brand{padding:9px 11px;max-width:46vw}.brand strong{font-size:13px}.brand span{font-size:10px}
+ .service{min-width:0;padding:9px 10px;max-width:49vw}.service .line{font-size:10px}.service .hours{font-size:12px}.service .freq{font-size:9px}
+ .marker .name{font-size:10px;padding:3px 5px}.pin{width:28px;height:28px;font-size:13px}.marker.food .pin{width:27px;height:27px;font-size:13px}
+ .popup{left:0;right:0;bottom:0;top:auto;width:auto;max-height:74vh;border-radius:22px 22px 0 0;border-bottom:0;padding-bottom:env(safe-area-inset-bottom)}
+ .popup::before{content:"";position:absolute;top:7px;left:50%;transform:translateX(-50%);width:40px;height:4px;border-radius:3px;background:rgba(255,255,255,.85);z-index:3;box-shadow:0 1px 3px #0003}
+ .popup h2{font-size:18px}
+ .timetable{right:10px;top:72px}
+ .legend{left:10px;bottom:calc(12px + env(safe-area-inset-bottom));padding:9px 10px}
+ .map-controls{right:10px;bottom:calc(12px + env(safe-area-inset-bottom));gap:6px}.map-controls button{width:38px;height:38px}
+ .attribution{display:none}
+ body.sheet .legend,body.sheet .map-controls{opacity:0;pointer-events:none}
+}
+</style>
+</head>
+<body>
+<div id="map" aria-label="Lisbon 28E interactive map">
+  <svg id="fallback" viewBox="0 0 1200 800" preserveAspectRatio="none" aria-hidden="true"><defs><pattern id="grid" width="78" height="78" patternUnits="userSpaceOnUse"><path d="M78 0H0V78" fill="none" stroke="#ded8ca" stroke-width="1"/></pattern></defs><rect width="1200" height="800" fill="#eee9dc"/><rect width="1200" height="800" fill="url(#grid)"/></svg>
+  <div id="tiles"></div>
+  <svg id="route-svg" aria-hidden="true"><g id="g-ret"></g><path id="route-casing" fill="none" stroke="#fffdf8" stroke-width="13" stroke-linecap="round" stroke-linejoin="round"/><g id="g-elev"></g><path id="route-dash" fill="none" stroke="rgba(255,255,255,.75)" stroke-width="1.6" stroke-dasharray="2 10" stroke-linecap="round"/></svg>
+  <div id="markers"></div>
+  <div id="tile-warning" class="tile-warning">地图底图需要网络连接。路线和标记仍可使用；联网后会自动加载街道底图。</div>
+  <div class="topbar">
+    <div class="brand"><strong>里斯本 28E 黄色电车</strong><span>景点 · 海鲜餐厅 · 海拔配色路线</span></div>
+    <button class="service" id="service-btn" aria-label="查看电车班次"><div class="line">28E · 冬季工作日</div><div class="hours">05:40 首班 · 23:30 末班</div><div class="freq">白天约 8–11 分钟一班 ｜ 点我看详情</div></button>
+  </div>
+  <div class="popup" id="popup" role="dialog" aria-live="polite"><button class="close" id="popup-close" aria-label="关闭">×</button><div id="popup-content"></div></div>
+  <div class="timetable" id="timetable" role="dialog"><button class="close" id="time-close" aria-label="关闭">×</button>
+    <h3>28E 运行信息</h3>
+    <div class="meta" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px"><span class="pill">工作日</span><span class="pill blue">冬季时刻表</span></div>
+    <p><b>运行时间：</b>Carris 官网的工作日冬季时刻表约 05:40 首班、23:30 末班。白天大约每 8–11 分钟一班，晚上间隔更长。</p>
+    <p><b>全程：</b>Martim Moniz → Graça → Alfama → Sé → Baixa → Chiado → São Bento → Estrela → Prazeres，约 50–60 分钟。</p>
+    <p><b>往返路线不完全一样：</b>有三段去程和回程走的是不同的街（地图上的蓝色虚线是回程独有的路段）：</p>
+    <p>① <b>Anjos 一带：</b>去程走 R. Maria da Fonte；回程绕经 R. Forno do Tijolo、R. Maria。<br>② <b>São Bento：</b>去程走 R. Poiais de São Bento；回程走 R. Poço dos Negros。<br>③ <b>Baixa → Sé：</b>回程多经过 Igreja da Madalena 一站。</p>
+    <p style="color:#8a5a12"><b>⚠ 注意：</b>Carris 在 2025 年 5 月发过一条"临时调整"通知，说 Martim Moniz ↔ Graça 这段在早 7 点前、晚 9 点后改由巴士接驳。通知里没有写结束日期，出发前最好在站牌或官网确认一下。</p>
+    <p><a href="https://www.carris.pt/en/travel/carreiras/28e/" target="_blank" rel="noopener">Carris 28E 官方页面（实时时刻）↗</a><br><a href="https://carris.pt/en/discover/28e-temporary-interruption/" target="_blank" rel="noopener">临时调整通知 ↗</a></p>
+  </div>
+  <div class="legend" id="legend">
+    <button class="collapse" id="legend-toggle" aria-label="收起图例">–</button>
+    <div class="body">
+      <div class="row"><b style="font-size:11px;color:#26343a">路线海拔</b></div>
+      <div class="row"><div class="bar" id="elev-bar"></div></div>
+      <div class="k"><span id="elev-min">低</span><span>中</span><span id="elev-max">高</span></div>
+      <div class="row"><span class="ret"></span><span>回程独有路段</span></div>
+      <div class="chips"><button class="chip on" id="chip-food">🍴 餐厅</button><button class="chip on" id="chip-names">名称</button><button class="chip" id="chip-ret">回程路线</button></div>
+      <div class="src" id="elev-src">海拔为估算值，联网后自动更新为实测数据</div>
+    </div>
+    <div class="min-label" style="display:none;font-weight:750">图例</div>
+  </div>
+  <div class="map-controls"><button id="zoom-in" aria-label="放大">+</button><button id="zoom-out" aria-label="缩小">−</button><button id="fit" aria-label="显示全线" style="font-size:13px;font-weight:750">全线</button><button id="locate" aria-label="我的位置" style="font-size:19px">◎</button></div>
+  <div id="toast"></div>
+  <div class="attribution">© <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> · Tiles © Esri · 照片 Wikimedia Commons</div>
+</div>
+<script>
+'use strict';
+/* ================= 数据 ================= */
+const HOTEL={lat:38.7217299,lon:-9.1510193,pid:'ChIJg9enLBAzGQ0ReaugLDCxeMo',name:'Hotel Olivia Lisboa'};
+const gq=(q,pid)=>'https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(q)+(pid?'&query_place_id='+pid:'');
+const dirTo=(lat,lon,mode)=>'https://www.google.com/maps/dir/?api=1&destination='+encodeURIComponent(lat+','+lon)+'&travelmode='+(mode||'driving');
+
+const POINTS=[
+ {id:'s1',n:1,name:'Hotel Olivia Lisboa',short:'你的酒店',lat:HOTEL.lat,lon:HOTEL.lon,kind:'hotel',g:gq('Hotel Olivia Lisboa',HOTEL.pid),
+  taxi:'去 Martim Moniz 约 6–10 分钟',tram:'酒店不在 28E 线上',desc:'你的住宿位置（R. Alexandre Herculano 35）。建议从这里打车去 Martim Moniz 始发站，再开始 28E 行程。',tip:'上车点：Martim Moniz（2 号标记）。'},
+ {id:'s2',n:2,name:'Martim Moniz',short:'28E 建议上车点',lat:38.71519,lon:-9.13604,kind:'start',g:gq('Praça Martim Moniz, Lisboa'),
+  taxi:'回酒店约 6–10 分钟',tram:'始发站 · 05:40–23:30',desc:'建议从始发站上车，车头显示 Campo Ourique / Prazeres 方向的就是。这里最容易抢到靠窗座位。',tip:'往 Prazeres 方向坐左侧，风景更好；排队长就等下一班。',
+  photos:['Tram 28 (33266050673).jpg','Martim Moniz - Lisboa - Portugal (32840817044).jpg','28 to Martim Moniz boarding.jpg','Martim Moniz - Lisboa - Portugal (43581500922).jpg']},
+ {id:'s3',n:3,name:'Graça · Senhora do Monte',short:'格拉萨观景区',lat:38.71725,lon:-9.12978,g:gq('Miradouro da Senhora do Monte, Lisboa'),
+  taxi:'回酒店约 10–15 分钟',tram:'从始发站约 12 分钟',desc:'在 Graça 一带下车。先逛 Miradouro da Graça，再上坡走 10–15 分钟到 Senhora do Monte。这里能俯瞰红屋顶、城堡和特茹河，是里斯本视野最开阔的全景之一，也是整条线的最高点附近。',tip:'适合拍全景；坡道陡，穿舒适的鞋。',
+  photos:['Miradouro da Senhora do Monte - Lisboa - Portugal (23327213265).jpg','Lisboa vista do miradouro da Sra. do Monte - Lisboa - Portugal (2757818686).jpg','Miradouro Nossa Senhora do Monte II.jpg','Tram28lisboa.jpg']},
+ {id:'s4',n:4,name:'Portas do Sol · Santa Luzia',short:'太阳门与圣卢西亚观景台',lat:38.7124,lon:-9.13036,g:gq('Miradouro de Santa Luzia, Lisboa'),
+  taxi:'回酒店约 9–14 分钟',tram:'从始发站约 20–22 分钟',desc:'两处相邻的观景露台，能看到 Alfama 红屋顶、河面和教堂。从这里步行钻进 Alfama 老巷，慢慢看瓷砖立面、晾衣阳台和小广场。',tip:'最值得慢逛的老城区路段。',
+  photos:['Miradouro de Santa Luzia - Lisboa - Portugal (46641229062).jpg','Looking down from Miradouro de Santa Luzia - Lisbon (52750123372).jpg','Amazing tile work at Miradouro de Santa Luzia - Lisbon (52750123452).jpg','MiradouroSantaLuzia.JPG']},
+ {id:'s5',n:5,name:'Sé de Lisboa',short:'里斯本主教堂',lat:38.709825,lon:-9.132641,g:gq('Sé de Lisboa'),
+  taxi:'回酒店约 7–11 分钟',tram:'从始发站约 26 分钟',desc:'里斯本中世纪主教座堂，厚重的罗马式外观像一座小城堡。电车从教堂正门前驶过，是最经典的 28E 取景点。',tip:'教堂外观可以和附近的 Alfama 巷弄一起逛。',
+  photos:['Catedral da Sé - Lisboa - Portugal (53055536359).jpg','Sé de Lisboa ao fundo com elétrico em primeiro plano.jpg','The 28 picking up passengers in front of Sé de Lisboa.JPG','Sé de Lisboa - Portugal (53413776142).jpg']},
+ {id:'s6',n:6,name:'Chiado · Praça Luís de Camões',short:'希亚多与卡蒙斯广场',lat:38.71077,lon:-9.14357,g:gq('Praça Luís de Camões, Lisboa'),
+  taxi:'回酒店约 6–9 分钟',tram:'从始发站约 37–38 分钟',desc:'历史文化街区，书店、剧院、老咖啡馆和广场都在这里。适合下车慢慢逛，也可以沿街走到 Bairro Alto。',tip:'从广场步行探索 Chiado 和 Bairro Alto。',
+  photos:['Lisbon 10064 Lisboa Praça Luís de Camões 2006 Luca Galuzzi.jpg','Lisboa, tranvía 28.jpg','Monumento a Luís Vaz de Camões - Lisboa - Portugal (14664238667).jpg','Praça Luís de Camões (Lisboa).jpg']},
+ {id:'s7',n:7,name:'Calhariz · Bica',short:'比卡缆车街',lat:38.71083,lon:-9.14595,g:gq('Elevador da Bica, Lisboa'),
+  taxi:'回酒店约 6–10 分钟',tram:'从始发站约 39 分钟',desc:'靠近 Elevador da Bica 那条著名的黄色缆车街。窄坡道、老房子加上缆车，是很有辨识度的里斯本画面。',tip:'石板坡路很滑；不要站在轨道上拍照。',
+  photos:['Lisbon Bica Funicular-Elevador da Bica.jpg','Elevador da Bica de lado.jpg','Funicular de Bica, Lisboa.JPG','Looking back at the train lift - Elevador da Bica - Lisbon (52751409020).jpg']},
+ {id:'s8',n:8,name:'Basílica da Estrela · Jardim da Estrela',short:'埃什特雷拉圣殿与花园',lat:38.71369,lon:-9.16011,g:gq('Basílica da Estrela, Lisboa'),
+  taxi:'回酒店约 7–11 分钟',tram:'从始发站约 50 分钟',desc:'新古典主义风格的圣殿，对面是 Jardim da Estrela 社区公园，能看到当地人散步、遛狗、带孩子，很有日常生活感。',tip:'在公园里坐一会儿，节奏放慢。',
+  photos:['Basilica da Estrela - Lisboa.jpg','Igreja-Estrela.jpg','Basílica da Estrela from Jardim da Estrela, Lisbon.jpg','Lisbon Tram 28 at Jardim Da Estrela (50653481918).jpg']},
+ {id:'s9',n:9,name:'Cemitério dos Prazeres',short:'普拉泽雷斯历史公墓',lat:38.71425,lon:-9.16951,g:gq('Cemitério dos Prazeres, Lisboa'),
+  taxi:'回酒店约 8–12 分钟',tram:'28E 终点 · 从始发站约 57 分钟',desc:'28E 的 Prazeres 终点就在旁边。墓园以宏大的家族陵墓、雕塑和墓园小街闻名，建筑氛围很特别，和普通景点完全不同。',tip:'尊重墓园环境；开放时间以入口公告为准。',
+  photos:['Cemitério dos Prazeres • Cemetery Prazeres (50662796502).jpg','Cemitério dos Prazeres • Cemetery Prazeres (50661972308).jpg','Flowers around a mausoleum, Prazeres cemetery, Lisbon, Portugal (PPL1-Corrected) julesvernex2.jpg','Cat sleeping on a bench, Prazeres Cemetery, Lisbon, Portugal julesvernex2.jpg']}
+];
+// 营业时间：索引 0=周日 … 6=周六
+const RESTAURANTS=[
+ {id:'rA',n:'A',kind:'food',name:'Solar 31 da Calçada',short:'Solar 31',lat:38.7153878,lon:-9.138028,pid:'ChIJScoGEIczGQ0RuiCmilKHifg',
+  addr:'Calçada do Garcia 31',phone:'+351 21 886 3374',rating:'4.7',reviews:'3,772',badge:'我的第一推荐',
+  hours:['17:00–23:00','11:00–23:00','11:00–23:00','11:00–23:00','11:00–23:00','11:00–23:00','11:00–23:00'],
+  taxi:'回酒店约 7–10 分钟',near:'离 Martim Moniz 始发站步行约 3 分钟',
+  desc:'传统葡式海鲜和炭烤，小而精致。烤章鱼和虾是招牌，很多评价还专门夸 Bulhão Pato 蒜香白酒蛤蜊。离 28E 起点很近，适合坐车前或回来后吃。',
+  dishes:['烤章鱼 Polvo','蒜香蛤蜊 Amêijoas à Bulhão Pato','老虎虾 / 蒜香虾','烤鳎鱼 Linguado'],
+  photos:[['Amêijoas à Bulhão Pato.jpg','Bulhão Pato 蒜香蛤蜊'],['Polvo à Lagareiro.jpg','葡式烤章鱼'],['Gambas al Ajillo.jpg','蒜香虾'],['Ameijoas à bulhão Pato.jpg','蛤蜊配面包蘸汁'],['Arroz de marisco in Lisbon.jpg','海鲜饭 Arroz de marisco']]},
+ {id:'rB',n:'B',kind:'food',name:'Frade dos Mares',short:'Frade dos Mares',lat:38.708465,lon:-9.153227,pid:'ChIJdTVGvYM0GQ0RWjKJ5nUblhg',
+  addr:'Av. Dom Carlos I 55A',phone:'+351 21 390 9418',rating:'4.7',reviews:'3,803',
+  hours:['13:00–15:30, 18:30–22:30','12:30–15:00, 18:30–22:30','12:30–15:00, 18:30–22:30','12:30–15:00, 18:30–22:30','12:30–15:00, 18:30–22:30','12:30–15:00, 18:30–22:30','13:00–15:30, 18:30–22:30'],
+  taxi:'回酒店约 8–12 分钟',near:'离 28E「R. S. Bento / Cç. Estrela」站步行约 5 分钟（上坡）',
+  desc:'偏精致的葡萄牙海鲜餐厅。烤章鱼被反复点名，带一点烟熏味；海鲜饭和当日鲜鱼（比如鲷鱼）也很受欢迎。注意下午 3 点到 6 点半中间不营业。',
+  dishes:['招牌烤章鱼','海鲜饭 / 虾仁烩饭','当日鲜鱼 Dourada','蒜香虾'],
+  photos:[['Polvo a lagareiro.jpg','烤章鱼配土豆'],['Polvo à Lagareiro (8568957506).jpg','Polvo à Lagareiro'],['Arroz de marisco - Tavira.jpg','葡式海鲜饭'],['Polvo à Lagareiro u Portu.jpg','烤章鱼腕'],['Bacalhau a Lagareiro (50762086577).jpg','烤鳕鱼 Bacalhau']]},
+ {id:'rC',n:'C',kind:'food',name:'Floresta das Escadinhas',short:'Floresta',lat:38.712682,lon:-9.13642,pid:'ChIJx31Ab3g0GQ0RIQY9rn3J0QA',
+  addr:'R. de Santa Justa 3',phone:'+351 21 887 2052',rating:'4.7',reviews:'3,522',
+  hours:['12:00–22:00','12:00–23:00','12:00–22:00','12:00–22:00','12:00–22:00','12:00–22:00','12:00–22:00'],
+  taxi:'回酒店约 8–12 分钟',near:'离 28E「R. Conceição」站步行约 4 分钟',
+  desc:'老派 tasca 风格，主打简单直接的炭烤海鲜。烤沙丁鱼、烤章鱼和混合烤鱼拼盘最受好评，有人说这里的章鱼是在葡萄牙吃过最好的。章鱼偶尔会卖完，人多，早点去。按 Google 上的时间，中午到晚上都营业，不只是午餐。',
+  dishes:['烤沙丁鱼 Sardinhas','烤章鱼','混合烤鱼拼盘（两人份）','炭烤鳕鱼'],
+  photos:[['Grilled Sardines 5.50€ Marisqueira O Varino Nazaré (3785526688).jpg','炭烤沙丁鱼'],['Sardinhas assadas.jpg','一盘葡式烤沙丁鱼'],['Grilled octopus 2.jpg','炭烤章鱼'],['A Tasquinha Sardines.jpg','Tasca 风格沙丁鱼'],['Bacalhau a Lagareiro (50762086577).jpg','烤鳕鱼配土豆']]},
+ {id:'rD',n:'D',kind:'food',name:'CATAPLANA (Uma Marisqueira)',short:'Cataplana',lat:38.7121797,lon:-9.1370567,pid:'ChIJe_gCbKszGQ0RuD-Ryobh0rI',
+  addr:'R. dos Douradores 115–119',phone:'+351 920 038 548',rating:'4.8',reviews:'7,990',badge:'Google 评分最高',
+  hours:['12:00–23:00','12:00–23:00','12:00–23:00','12:00–23:00','12:00–23:00','12:00–23:00','12:00–23:00'],
+  taxi:'回酒店约 8–12 分钟',near:'离 28E「R. Conceição」站步行约 3 分钟',
+  desc:'正经的葡萄牙 Marisqueira（海鲜馆）。招牌是用铜锅做的 Cataplana 海鲜锅，龙虾 Cataplana 也很多人点；海鲜饭、烤章鱼和去了内脏的烤沙丁鱼都有好评。每天营业到晚上 11 点。',
+  dishes:['Cataplana 铜锅海鲜','龙虾 Cataplana','海鲜饭 Arroz de marisco','烤章鱼 Polvo grelhado'],
+  photos:[['Seafood Cataplana at World Heritage Cuisine Summit & Food Festival 2018 (Day 2) - 20.jpg','Cataplana 铜锅海鲜'],['Seafood Cataplana at World Heritage Cuisine Summit & Food Festival 2018 (Day 2) - 26.jpg','Cataplana 开锅'],['Arroz de marisco.jpg','葡式海鲜饭'],['Octopus tentacle for dinner in Guimarães.jpg','烤章鱼腕'],['Grilled Sardines 5.50€ Marisqueira O Varino Nazaré (3785526688).jpg','烤沙丁鱼']]}
+];
+RESTAURANTS.forEach(r=>r.g=gq(r.name,r.pid));
+const ALL=[...POINTS,...RESTAURANTS];
+
+/* 去程路线（Martim Moniz → Prazeres），e = 估算海拔（米），联网后会被 Open-Meteo 实测值替换 */
+const ROUTE=[
+ [38.71519,-9.13604,25],[38.7164,-9.1364,30],[38.7174,-9.1361,35],[38.7187,-9.1356,42],[38.7205,-9.1350,50],[38.72346,-9.1337,58],[38.72244,-9.13265,68],[38.72231,-9.13101,78],[38.7225,-9.1295,85],
+ [38.7212,-9.1302,90],[38.7198,-9.1305,92],[38.71725,-9.12978,90],[38.7158,-9.1297,85],[38.7143,-9.1301,78],[38.7131,-9.1309,72],[38.7124,-9.13036,68],[38.71148,-9.13062,62],[38.7108,-9.1315,55],
+ [38.71002,-9.13423,40],[38.7099,-9.1365,12],[38.7102,-9.1391,10],[38.7105,-9.1415,25],[38.71077,-9.14357,50],[38.71083,-9.14595,60],[38.7105,-9.1475,55],[38.7106,-9.149,45],[38.7108,-9.1512,32],
+ [38.7115,-9.153,25],[38.7121,-9.1553,35],[38.7128,-9.1575,55],[38.71369,-9.16011,75],[38.7142,-9.1623,80],[38.7145,-9.1645,85],[38.7146,-9.1665,88],[38.7145,-9.168,88],[38.71425,-9.16951,90]
+];
+/* 回程独有路段（示意） */
+const RETURN_SEGS=[
+ {name:'Anjos：R. Forno do Tijolo / R. Maria',pts:[[38.72231,-9.13101],[38.7238,-9.1318],[38.72483,-9.13309],[38.72459,-9.1334],[38.72346,-9.1337]]},
+ {name:'São Bento：R. Poço dos Negros',pts:[[38.7106,-9.149],[38.70995,-9.15138],[38.7115,-9.153]]},
+ {name:'Baixa：经 Igreja da Madalena',pts:[[38.7099,-9.1365],[38.71011,-9.13492],[38.71002,-9.13423]]}
+];
+
+/* ================= 地图核心 ================= */
+const map=document.getElementById('map'),tileLayer=document.getElementById('tiles'),markersLayer=document.getElementById('markers'),svg=document.getElementById('route-svg'),fallback=document.getElementById('fallback'),warning=document.getElementById('tile-warning');
+let zoom=15,center={lat:38.716,lon:-9.149},drag=null,loadedTiles=0,failedTiles=0,selected=null,tileNodes=[],showRet=false;
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+function project(lat,lon,z=zoom){const s=256*Math.pow(2,z),sin=Math.sin(lat*Math.PI/180);return{x:(lon+180)/360*s,y:(.5-Math.log((1+sin)/(1-sin))/(4*Math.PI))*s}}
+function unproject(x,y,z=zoom){const s=256*Math.pow(2,z),lon=x/s*360-180,n=Math.PI-2*Math.PI*y/s;return{lat:180/Math.PI*Math.atan(Math.sinh(n)),lon}}
+function screenPos(lat,lon){const c=project(center.lat,center.lon),p=project(lat,lon);return{x:p.x-c.x+map.clientWidth/2,y:p.y-c.y+map.clientHeight/2}}
+function fitBounds(){const all=ALL.map(p=>[p.lat,p.lon]).concat(ROUTE);let a=90,b=-90,c=180,d=-180;all.forEach(([la,lo])=>{a=Math.min(a,la);b=Math.max(b,la);c=Math.min(c,lo);d=Math.max(d,lo)});center={lat:(a+b)/2,lon:(c+d)/2};const z0=16,sx=Math.abs(project(b,d,z0).x-project(a,c,z0).x),sy=Math.abs(project(b,d,z0).y-project(a,c,z0).y);zoom=clamp(z0+Math.log2(Math.min(map.clientWidth*.9/sx,map.clientHeight*.55/sy)),13,16);const cc=project(center.lat,center.lon);center=unproject(cc.x,cc.y+map.clientHeight*.06)}
+const SOURCES=[(z,x,y)=>`https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/${z}/${y}/${x}`,(z,x,y)=>`https://${'abc'[(x+y)%3]}.tile.openstreetmap.fr/osmfr/${z}/${x}/${y}.png`];
+let sourceIdx=0;
+function tileURL(z,x,y,s=sourceIdx){const n=Math.pow(2,z);x=((x%n)+n)%n;if(y<0||y>=n)return '';return SOURCES[s](z,x,y)}
+const tz=()=>Math.floor(zoom+1e-9),ts=()=>256*Math.pow(2,zoom-tz());
+function positionTiles(){const w=map.clientWidth,h=map.clientHeight,c=project(center.lat,center.lon),left=c.x-w/2,top=c.y-h/2,S=ts();tileNodes.forEach(t=>{const st=t.img.style;st.left=(t.x*S-left)+'px';st.top=(t.y*S-top)+'px';st.width=st.height=(S+.5)+'px'})}
+function renderTiles(){tileLayer.innerHTML='';tileNodes=[];loadedTiles=0;failedTiles=0;const w=map.clientWidth,h=map.clientHeight,c=project(center.lat,center.lon),left=c.x-w/2,top=c.y-h/2,z=tz(),S=ts();
+ for(let x=Math.floor(left/S)-1;x<=Math.floor((left+w)/S)+1;x++)for(let y=Math.floor(top/S)-1;y<=Math.floor((top+h)/S)+1;y++){const src=tileURL(z,x,y);if(!src)continue;const img=document.createElement('img');img.alt='';img.draggable=false;img.dataset.s=sourceIdx;
+  img.onload=()=>{loadedTiles++;fallback.style.opacity='0';warning.classList.remove('show')};
+  img.onerror=()=>{const next=+img.dataset.s+1;if(next<SOURCES.length){img.dataset.s=next;if(loadedTiles===0)sourceIdx=next;img.src=tileURL(z,x,y,next);return}img.style.visibility='hidden';failedTiles++;if(failedTiles>=4&&loadedTiles===0){fallback.style.opacity='1';warning.classList.add('show')}};
+  img.src=src;tileLayer.appendChild(img);tileNodes.push({x,y,img})}
+ positionTiles()}
+
+/* 海拔配色 */
+const STOPS=[[0,[31,122,140]],[.5,[224,165,38]],[1,[192,57,43]]];
+function elevColor(t){t=clamp(t,0,1);for(let i=1;i<STOPS.length;i++){if(t<=STOPS[i][0]){const[a,ca]=STOPS[i-1],[b,cb]=STOPS[i],k=(t-a)/(b-a);return`rgb(${ca.map((v,j)=>Math.round(v+(cb[j]-v)*k)).join(',')})`}}return'rgb(192,57,43)'}
+let eMin=0,eMax=100;
+function updateElevRange(){const es=ROUTE.map(p=>p[2]);eMin=Math.min(...es);eMax=Math.max(...es);document.getElementById('elev-min').textContent=`低 ${Math.round(eMin)}m`;document.getElementById('elev-max').textContent=`高 ${Math.round(eMax)}m`;document.getElementById('elev-bar').style.background=`linear-gradient(90deg,${elevColor(0)},${elevColor(.5)},${elevColor(1)})`}
+const pathD=pts=>pts.map((p,i)=>{const q=screenPos(p[0],p[1]);return(i?'L':'M')+q.x.toFixed(1)+' '+q.y.toFixed(1)}).join(' ');
+function renderOverlay(){document.body.classList.toggle('far',zoom<14);const w=map.clientWidth,h=map.clientHeight;svg.setAttribute('viewBox',`0 0 ${w} ${h}`);svg.setAttribute('width',w);svg.setAttribute('height',h);
+ const d=pathD(ROUTE);document.getElementById('route-casing').setAttribute('d',d);document.getElementById('route-dash').setAttribute('d',d);
+ const g=document.getElementById('g-elev');let html='';const sw=zoom>=16?8:7;
+ for(let i=0;i<ROUTE.length-1;i++){const a=screenPos(ROUTE[i][0],ROUTE[i][1]),b=screenPos(ROUTE[i+1][0],ROUTE[i+1][1]),e=(ROUTE[i][2]+ROUTE[i+1][2])/2;html+=`<line x1="${a.x.toFixed(1)}" y1="${a.y.toFixed(1)}" x2="${b.x.toFixed(1)}" y2="${b.y.toFixed(1)}" stroke="${elevColor((e-eMin)/Math.max(1,eMax-eMin))}" stroke-width="${sw}" stroke-linecap="round"/>`}
+ g.innerHTML=html;
+ document.getElementById('g-ret').innerHTML=showRet?RETURN_SEGS.map(s=>`<path d="${pathD(s.pts)}" fill="none" stroke="#fffdf8" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/><path d="${pathD(s.pts)}" fill="none" stroke="#2f6fb0" stroke-width="3.5" stroke-dasharray="7 6" stroke-linecap="round" stroke-linejoin="round"/>`).join(''):'';
+ markersLayer.innerHTML='';
+ ALL.forEach(p=>{const q=screenPos(p.lat,p.lon),b=document.createElement('button');b.className='marker '+(p.kind||'')+(selected===p.id?' active':'');b.style.left=q.x+'px';b.style.top=q.y+'px';b.setAttribute('aria-label',`${p.n}. ${p.name}`);
+  b.innerHTML=`<span class="pin">${p.kind==='food'?'🍴':p.n}</span><span class="name">${p.kind==='food'?p.n+' · ':''}${p.short}</span>`;
+  b.addEventListener('click',e=>{e.stopPropagation();openPlace(p)});markersLayer.appendChild(b)});
+ drawMe()}
+function render(){renderTiles();renderOverlay()}
+
+/* 实测海拔（Open-Meteo，失败就用估算值） */
+function loadElevation(){const lats=ROUTE.map(p=>p[0].toFixed(5)).join(','),lons=ROUTE.map(p=>p[1].toFixed(5)).join(',');
+ fetch(`https://api.open-meteo.com/v1/elevation?latitude=${lats}&longitude=${lons}`).then(r=>r.ok?r.json():Promise.reject()).then(j=>{if(!j.elevation||j.elevation.length!==ROUTE.length)return;
+  j.elevation.forEach((e,i)=>{if(typeof e==='number')ROUTE[i][2]=e});updateElevRange();renderOverlay();document.getElementById('elev-src').textContent='海拔数据：Open-Meteo（Copernicus DEM 实测）'}).catch(()=>{})}
+
+/* ================= 卡片 ================= */
+const fileUrl=(f,w)=>'https://commons.wikimedia.org/wiki/Special:FilePath/'+encodeURIComponent(f.replace(/ /g,'_'))+(w?'?width='+w:'');
+const pageUrl=f=>'https://commons.wikimedia.org/wiki/File:'+encodeURIComponent(f.replace(/ /g,'_'));
+const DAYS=['周日','周一','周二','周三','周四','周五','周六'];
+function galleryHTML(list){if(!list||!list.length)return '';const w=Math.min(1200,Math.round(420*Math.min(devicePixelRatio||1,2.5)));
+ return `<div class="gallery"><div class="track">${list.map((it,i)=>{const[f,cap]=Array.isArray(it)?it:[it,''];return`<div class="slide" data-f="${encodeURIComponent(f)}"><img alt="${cap}" decoding="async" ${i?'loading="lazy"':''} src="${fileUrl(f,w)}" onload="this.classList.add('ok')" onerror="var s=this.closest('.slide');s&&s.remove();window.__fixGallery&&__fixGallery()">${cap?`<div class="cap">${cap}</div>`:''}</div>`}).join('')}</div>
+ <button class="nav prev" aria-label="上一张">‹</button><button class="nav next" aria-label="下一张">›</button><a class="credit" target="_blank" rel="noopener" href="#">Wikimedia Commons</a><div class="dots"></div><span class="count"></span></div>`}
+function wireGallery(root){const g=root.querySelector('.gallery');if(!g)return;const track=g.querySelector('.track'),dots=g.querySelector('.dots'),count=g.querySelector('.count'),credit=g.querySelector('.credit');
+ const slides=()=>[...track.children],idx=()=>Math.round(track.scrollLeft/Math.max(1,track.clientWidth));
+ const update=()=>{const n=slides().length;if(!n){g.remove();return}const i=Math.min(idx(),n-1);dots.innerHTML=n>1?slides().map((_,k)=>`<i class="${k===i?'on':''}"></i>`).join(''):'';count.textContent=`${i+1} / ${n}`;credit.href=pageUrl(decodeURIComponent(slides()[i].dataset.f));g.querySelector('.prev').style.visibility=i?'visible':'hidden';g.querySelector('.next').style.visibility=i<n-1?'visible':'hidden'};
+ window.__fixGallery=update;let t;track.addEventListener('scroll',()=>{clearTimeout(t);t=setTimeout(update,60)},{passive:true});
+ const go=d=>track.scrollTo({left:(idx()+d)*track.clientWidth,behavior:'smooth'});g.querySelector('.prev').onclick=()=>go(-1);g.querySelector('.next').onclick=()=>go(1);update()}
+function focusPlace(p){const w=map.clientWidth,h=map.clientHeight,mobile=w<=700;if(zoom<15)zoom=15;const pp=project(p.lat,p.lon),tx=mobile?w/2:(w-410)/2,ty=mobile?h*0.18:h/2;center=unproject(pp.x-(tx-w/2),pp.y-(ty-h/2));render()}
+function sightHTML(p){const isHotel=p.kind==='hotel',list=POINTS,i=list.indexOf(p);
+ const primary=isHotel?`<a class="btn primary" href="${dirTo(POINTS[1].lat,POINTS[1].lon)}" target="_blank" rel="noopener">打车/导航到上车点 ↗</a>`:`<a class="btn primary" href="${dirTo(HOTEL.lat,HOTEL.lon)}" target="_blank" rel="noopener">导航回酒店 ↗</a><a class="btn" href="${dirTo(p.lat,p.lon,'walking')}" target="_blank" rel="noopener">带我去这里 ↗</a>`;
+ return `${galleryHTML(p.photos)}<div class="scroll"><div class="eyebrow">${isHotel?'HOTEL':'28E 沿线 · 景点'}　·　${p.n}/9</div><h2>${p.name}</h2><div class="meta"><span class="pill">🚕 ${p.taxi}</span><span class="pill blue">🚋 ${p.tram}</span></div><p>${p.desc}</p>${p.tip?`<p><b>体验提示：</b>${p.tip}</p>`:''}
+ <div class="action">${primary}</div><div class="action" style="margin-top:8px"><a class="btn" href="${p.g}" target="_blank" rel="noopener">在 Google 地图打开 ↗</a></div>
+ <div class="stepper"><button class="btn" data-go="${i-1}" ${i===0?'disabled':''}>‹ 上一站</button><button class="btn" data-go="${i+1}" ${i===list.length-1?'disabled':''}>下一站 ›</button></div></div>`}
+function foodHTML(r){const i=RESTAURANTS.indexOf(r),today=new Date().getDay();
+ return `${galleryHTML(r.photos)}<div class="scroll"><div class="eyebrow">🍴 海鲜餐厅 ${r.n}${r.badge?'　·　'+r.badge:''}</div><h2>${r.name}</h2>
+ <div class="meta"><span class="pill red">⭐ ${r.rating} · Google ${r.reviews} 条评价</span><span class="pill green">🕐 今天${DAYS[today]} ${r.hours[today]}</span><span class="pill">🚕 ${r.taxi}</span><span class="pill blue">🚋 ${r.near}</span></div>
+ <p>${r.desc}</p><div class="dishes">${r.dishes.map(d=>`<span>${d}</span>`).join('')}</div>
+ <details><summary>一周营业时间</summary><table class="hours">${[1,2,3,4,5,6,0].map(d=>`<tr class="${d===today?'today':''}"><td>${DAYS[d]}</td><td>${r.hours[d]}</td></tr>`).join('')}</table></details>
+ <p style="font-size:12px;margin:4px 0">📍 ${r.addr}　☎ ${r.phone}</p>
+ <div class="action"><a class="btn primary" href="${r.g}" target="_blank" rel="noopener">Google 地图 · 看店内实拍照片 ↗</a></div>
+ <div class="action" style="margin-top:8px"><a class="btn" href="${dirTo(r.lat,r.lon,'walking')}" target="_blank" rel="noopener">带我去这里 ↗</a><a class="btn" href="${dirTo(HOTEL.lat,HOTEL.lon)}" target="_blank" rel="noopener">吃完导航回酒店 ↗</a></div>
+ <p class="note">上面的照片是同款葡萄牙菜的示意图（来自 Wikimedia Commons），不是这家店的实拍；本店的菜品实拍请点 Google 地图查看。营业时间来自 Google，节假日可能会变。</p>
+ <div class="stepper"><button class="btn" data-go="${i-1}" ${i===0?'disabled':''}>‹ 上一家</button><button class="btn" data-go="${i+1}" ${i===RESTAURANTS.length-1?'disabled':''}>下一家 ›</button></div></div>`}
+function openPlace(p){selected=p.id;document.getElementById('timetable').classList.remove('open');
+ const pop=document.getElementById('popup'),c=document.getElementById('popup-content'),food=p.kind==='food';
+ pop.classList.toggle('food',food);c.innerHTML=food?foodHTML(p):sightHTML(p);pop.classList.add('open');document.body.classList.add('sheet');
+ wireGallery(c);const list=food?RESTAURANTS:POINTS;c.querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>openPlace(list[+b.dataset.go]));
+ if(food&&document.body.classList.contains('hide-food'))toggleFood();
+ focusPlace(p)}
+function closePopup(){document.getElementById('popup').classList.remove('open');document.body.classList.remove('sheet');selected=null;renderOverlay()}
+
+/* ================= 交互 ================= */
+function zoomAround(next,sx,sy){const old=zoom;next=clamp(next,13,18);if(next===old)return;const c=project(center.lat,center.lon),ll=unproject(c.x+(sx-map.clientWidth/2),c.y+(sy-map.clientHeight/2)),p2=project(ll.lat,ll.lon,next);zoom=next;center=unproject(p2.x-(sx-map.clientWidth/2),p2.y-(sy-map.clientHeight/2));render()}
+const zoomAt=n=>zoomAround(Math.round(n*2)/2,map.clientWidth/2,map.clientHeight/2);
+document.getElementById('zoom-in').onclick=()=>zoomAt(zoom+1);document.getElementById('zoom-out').onclick=()=>zoomAt(zoom-1);
+document.getElementById('fit').onclick=()=>{fitBounds();render()};document.getElementById('popup-close').onclick=closePopup;
+document.getElementById('time-close').onclick=()=>document.getElementById('timetable').classList.remove('open');
+document.getElementById('service-btn').onclick=()=>{closePopup();document.getElementById('timetable').classList.toggle('open')};
+function toggleFood(){document.body.classList.toggle('hide-food');document.getElementById('chip-food').classList.toggle('on',!document.body.classList.contains('hide-food'))}
+document.getElementById('chip-food').onclick=toggleFood;
+document.getElementById('chip-names').onclick=e=>{document.body.classList.toggle('hide-names');e.currentTarget.classList.toggle('on',!document.body.classList.contains('hide-names'))};
+document.getElementById('chip-ret').onclick=e=>{showRet=!showRet;e.currentTarget.classList.toggle('on',showRet);renderOverlay();if(showRet)toast('蓝色虚线 = 回程（往 Martim Moniz）独有的路段')};
+document.getElementById('legend-toggle').onclick=e=>{const L=document.getElementById('legend'),m=L.classList.toggle('min');e.currentTarget.textContent=m?'+':'–';L.querySelector('.min-label').style.display=m?'block':'none';if(m)L.querySelector('.min-label').style.paddingRight='18px'};
+const ptrs=new Map();let pinch=null,lastTap=0;
+map.addEventListener('pointerdown',e=>{if(e.target.closest('button,a,.popup,.service,.map-controls,.timetable,.legend'))return;ptrs.set(e.pointerId,{x:e.clientX,y:e.clientY});try{map.setPointerCapture(e.pointerId)}catch(_){}
+ if(ptrs.size===2){const[a,b]=[...ptrs.values()];pinch={d:Math.hypot(a.x-b.x,a.y-b.y),mx:(a.x+b.x)/2,my:(a.y+b.y)/2};drag=null;return}
+ const now=Date.now();if(now-lastTap<300){lastTap=0;const r=map.getBoundingClientRect();zoomAround(zoom+1,e.clientX-r.left,e.clientY-r.top);return}lastTap=now;
+ const c=project(center.lat,center.lon);drag={x:e.clientX,y:e.clientY,cx:c.x,cy:c.y,moved:false};map.classList.add('dragging')});
+map.addEventListener('pointermove',e=>{if(!ptrs.has(e.pointerId))return;ptrs.set(e.pointerId,{x:e.clientX,y:e.clientY});
+ if(pinch&&ptrs.size===2){const[a,b]=[...ptrs.values()],d=Math.hypot(a.x-b.x,a.y-b.y),r=map.getBoundingClientRect();if(d/pinch.d>1.19||d/pinch.d<0.84){zoomAround(zoom+(d>pinch.d?.5:-.5),pinch.mx-r.left,pinch.my-r.top);pinch.d=d}return}
+ if(!drag)return;if(Math.abs(e.clientX-drag.x)+Math.abs(e.clientY-drag.y)>4)drag.moved=true;center=unproject(drag.cx-(e.clientX-drag.x),drag.cy-(e.clientY-drag.y));positionTiles();renderOverlay()});
+function endPtr(e){ptrs.delete(e.pointerId);if(ptrs.size<2)pinch=null;if(drag&&ptrs.size===0){const moved=drag.moved;drag=null;map.classList.remove('dragging');if(moved)renderTiles()}}
+map.addEventListener('pointerup',endPtr);map.addEventListener('pointercancel',endPtr);
+map.addEventListener('wheel',e=>{e.preventDefault();const r=map.getBoundingClientRect();zoomAround(zoom+(e.deltaY<0?1:-1),e.clientX-r.left,e.clientY-r.top)},{passive:false});
+map.addEventListener('click',e=>{if(e.target===map||e.target===fallback||e.target===svg||e.target===markersLayer)closePopup()});
+window.addEventListener('resize',render);
+let me=null,watchId=null;
+function drawMe(){let d=document.getElementById('me-dot');if(!me){if(d)d.remove();return}if(!d){d=document.createElement('div');d.id='me-dot'}markersLayer.appendChild(d);const q=screenPos(me.lat,me.lon);d.style.left=q.x+'px';d.style.top=q.y+'px'}
+function toast(t){const el=document.getElementById('toast');el.textContent=t;el.classList.add('show');clearTimeout(toast._t);toast._t=setTimeout(()=>el.classList.remove('show'),2600)}
+document.getElementById('locate').onclick=()=>{if(!navigator.geolocation){toast('这个浏览器不支持定位');return}toast('正在定位…');
+ const ok=pos=>{const first=!me;me={lat:pos.coords.latitude,lon:pos.coords.longitude};if(first){center={...me};zoom=Math.max(zoom,16);render();toast('已显示你的位置')}else drawMe()};
+ const bad=err=>toast(err.code===1?'定位被拒绝：请在浏览器设置里允许位置权限':'暂时拿不到位置，请稍后再试');
+ if(watchId!==null)navigator.geolocation.clearWatch(watchId);watchId=navigator.geolocation.watchPosition(ok,bad,{enableHighAccuracy:true,timeout:15000,maximumAge:10000})};
+
+updateElevRange();fitBounds();render();loadElevation();
+</script>
+</body></html>
